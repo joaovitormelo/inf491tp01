@@ -88,7 +88,7 @@ class ArqMIDI:
                 # Use self._spb para converter esse valor para segundos.
                 # --------------------------------------------------
 
-                # inicio = ...
+                inicio = el.offset * self._spb
 
                 # --------------------------------------------------
                 # TODO 2:
@@ -99,7 +99,7 @@ class ArqMIDI:
                 # Use self._spb para converter esse valor para segundos.
                 # --------------------------------------------------
 
-                # dur = ...
+                dur = el.duration.quarterLength * self._spb
 
                 # --------------------------------------------------
                 # TODO 3:
@@ -111,8 +111,8 @@ class ArqMIDI:
                 # Caso a velocity não esteja disponível, use 64 como valor padrão.
                 # --------------------------------------------------
 
-                # vel = ...
-                # amp = ...
+                vel = el.volume.velocity if el.volume and el.volume.velocity else 64
+                amp = vel / 127
 
                 # --------------------------------------------------
                 # TODO 4:
@@ -128,7 +128,10 @@ class ArqMIDI:
                 # --------------------------------------------------
 
                 if isinstance(el, m21.chord.Chord):
-                    pass
+                    for pitch in el.pitches:
+                        freq = pitch.frequency
+                        evento = (freq, inicio, dur, amp)
+                        self.parts[-1]['eventos'].append(evento)
 
                 # --------------------------------------------------
                 # TODO 5:
@@ -143,7 +146,9 @@ class ArqMIDI:
                 # --------------------------------------------------
 
                 elif isinstance(el, m21.note.Note):
-                    pass
+                    freq = el.pitch.frequency
+                    evento = (freq, inicio, dur, amp)
+                    self.parts[-1]['eventos'].append(evento)
 
                 # --------------------------------------------------
                 # TODO 6:
@@ -158,14 +163,14 @@ class ArqMIDI:
                 # --------------------------------------------------
 
                 elif isinstance(el, m21.note.Unpitched):
-                    pass
+                    self.parts[-1]['percussiva'] = True
 
             # --------------------------------------------------
             # TODO 7:
             # Ordenar os eventos da parte pelo instante de início.
             # --------------------------------------------------
 
-            # self.parts[-1]['eventos'].sort(...)
+            self.parts[-1]['eventos'].sort(key=lambda e: e[1])
 
     def getPartList(
         self
