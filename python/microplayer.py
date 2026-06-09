@@ -336,6 +336,22 @@ class Player:
         # Caso algum item seja inválido, lançar ValueError.
         # --------------------------------------------------
 
+        for item in instrumentos:
+            instrumento = None
+            ganho = 1.0
+            if isinstance(item, Instrumento):
+                instrumento = item
+            elif isinstance(item, tuple) and len(item) == 2:
+                if isinstance(item[0], Instrumento) and isinstance(item[1], (int, float)):
+                    instrumento = item[0]
+                    ganho = item[1]
+                else:
+                    raise ValueError('Tupla deve conter um Instrumento e um ganho numérico')
+            else:
+                raise ValueError('Cada item deve ser um Instrumento ou uma tupla (Instrumento, ganho)')
+            self.instrumentos.append(instrumento)
+            self.ganhos.append(ganho)
+
         # --------------------------------------------------
         # TODO 2:
         # Criar os buffers de áudio.
@@ -348,7 +364,10 @@ class Player:
         # para acomodar releases, filtros ou pequenas sobras de sinal.
         # --------------------------------------------------
 
-        # self.buffers = ...
+        self.buffers = np.zeros((
+            len(self.arqMIDI.parts),
+            int(self.arqMIDI.duracao * self.sr) + (self.sr // 2)
+        ))
 
     def processa(
         self,
@@ -401,19 +420,20 @@ class Player:
         # - posicionar a nota no buffer da voz.
         # --------------------------------------------------
 
-        # for i in range(nparts):
-        #     eventos = ...
-        #     instrumento = ...
-        #
-        #     for evento in eventos:
-        #         f, inicio, dur, amp = evento
-        #
-        #         y = ...
-        #
-        #         ini = ...
-        #         fim = ...
-        #
-        #         self.buffers[i][ini:fim] += ...
+        for i in range(nparts):
+            eventos = self.arqMIDI.getPart(i)
+            instrumento = self.instrumentos[i]
+        
+            for evento in eventos:
+                f, inicio, dur, amp = evento
+        
+                y = instrumento.gerar_nota(f, dur, self.sr, amp)
+        
+                ini = int(inicio * self.sr)
+                fim = ini + dur * self.sr
+        
+                self.buffers[i][ini:fim] += y[:fim-ini]
+                # self.buffers[i][ini:fim] += ...
 
         # --------------------------------------------------
         # TODO 4:
@@ -468,24 +488,31 @@ class Player:
         # em chamadas sucessivas de getWav.
         # --------------------------------------------------
 
-        # buffers_mix = ...
+        buffers_mix = self.buffers.copy()
+        for i in range(buffers_mix.shape[0]):
+            buffers_mix[i] *= self.ganhos[i]
 
         # --------------------------------------------------
         # TODO 6:
         # Se canais == 0, retornar os buffers separados por voz.
         # --------------------------------------------------
 
+        if canais == 0:
+            return buffers_mix
+
         # --------------------------------------------------
         # TODO 7:
         # Misturar as vozes em um único sinal mono.
         # --------------------------------------------------
 
-        # buffer = ...
+        buffer = np.sum(buffers_mix, axis=0)
 
         # --------------------------------------------------
         # TODO 8:
         # Normalizar a mistura final para evitar clipping.
         # --------------------------------------------------
+
+        buffer /= np.max(np.abs(buffer))
 
         # --------------------------------------------------
         # TODO 9:
@@ -496,3 +523,8 @@ class Player:
         # Para estéreo simples, a mesma waveform mono pode ser
         # duplicada nos dois canais.
         # --------------------------------------------------
+
+        if canais == 1:
+            return buffer
+        elif canais == 2:
+            return np.stack((buffer, buffer), axis=-1)
