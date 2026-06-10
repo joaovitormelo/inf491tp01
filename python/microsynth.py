@@ -146,17 +146,22 @@ def fm(
     sr: int = 44100,
     retorna_t: bool = False
 ) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
-    f_mod = f_m
+    assert isinstance(dur, (int, float)), 'dur deve ser um float'
+    assert isinstance(f_c, (int, float)), 'f_c deve ser um float'
+    assert isinstance(f_m, (int, float)), 'f_m deve ser um float'
+    assert isinstance(I, (int, float)), 'I deve ser um float'
+    assert tipo_fm in ['const', 'mult'], "tipo_fm deve ser 'const' ou 'mult'"
+    assert isinstance(fase, (int, float)), 'fase deve ser um float'
+    assert unidade_fase in ['graus', 'rad'], "unidade_fase deve ser 'graus' ou 'rad'"
+    assert isinstance(sr, int), 'sr deve ser um inteiro'
 
+    f_mod = f_m
     if tipo_fm == 'mult':
         f_mod *= f_c
-    elif tipo_fm != 'const':
-        raise ValueError(f"Modo tipo_fm '{tipo_fm}' inválido. Valores permitidos: 'const', 'mult'.")
     
     fase_rad = np.deg2rad(fase) if unidade_fase == 'graus' else fase
+
     t = gera_tempo(dur, sr)
-
-
     Y = np.sin(
         2 * np.pi * f_c * t + fase_rad + I * np.sin(
             2 * np.pi * f_mod * t
@@ -173,7 +178,16 @@ def am(
     I: float = 0.5,
     sr: int = 44100
 ) -> np.ndarray:
-    pass
+  assert isinstance(y, np.ndarray), 'y deve ser um numpy array'
+  assert isinstance(f_mod, (int, float)), 'f_mod deve ser um número'
+  assert isinstance(I, (int, float)), 'I deve ser um número'
+  assert isinstance(sr, int), 'sr deve ser um inteiro'
+
+  t = gera_tempo(len(y)/sr, sr)
+
+  mod = 1 + I * np.sin(2 * np.pi * f_mod * t)
+  
+  return y * mod
 
 ########################################################
 #
