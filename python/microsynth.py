@@ -128,7 +128,10 @@ def filtro(
 ########################################################
 
 def freq2midi(f: float) -> int:
-    pass
+    assert isinstance(f, (float)), 'Frequência deve ser um float'
+    assert f > 0, 'Frequência deve ser positiva'
+
+    return 69 + 12 * np.log2(f / 440)
 
 ########################################################
 
@@ -143,7 +146,24 @@ def fm(
     sr: int = 44100,
     retorna_t: bool = False
 ) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
-    pass
+    f_mod = f_m
+
+    if tipo_fm == 'mult':
+        f_mod *= f_c
+    elif tipo_fm != 'const':
+        raise ValueError(f"Modo tipo_fm '{tipo_fm}' inválido. Valores permitidos: 'const', 'mult'.")
+    
+    fase_rad = np.deg2rad(fase) if unidade_fase == 'graus' else fase
+    t = gera_tempo(dur, sr)
+
+
+    Y = np.sin(
+        2 * np.pi * f_c * t + fase_rad + I * np.sin(
+            2 * np.pi * f_mod * t
+        )
+    )
+
+    return (t, Y) if retorna_t else Y
 
 ########################################################
 
