@@ -186,7 +186,7 @@ def am(
   t = gera_tempo(len(y)/sr, sr)
 
   mod = 1 + I * np.sin(2 * np.pi * f_mod * t)
-  
+
   return y * mod
 
 ########################################################
