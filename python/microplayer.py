@@ -420,9 +420,9 @@ class Player:
         # - posicionar a nota no buffer da voz.
         # --------------------------------------------------
 
-        for i in range(nparts):
-            eventos = self.arqMIDI.getPart(i)
-            instrumento = self.instrumentos[i]
+        for part in range(nparts):
+            eventos = self.arqMIDI.getPart(part)
+            instrumento = self.instrumentos[part]
         
             for evento in eventos:
                 f, inicio, dur, amp = evento
@@ -430,17 +430,16 @@ class Player:
                 y = instrumento.gerar_nota(f, dur, self.sr, amp)
         
                 ini = int(inicio * self.sr)
-                fim = ini + dur * self.sr
-        
-                self.buffers[i][ini:fim] += y[:fim-ini]
-                # self.buffers[i][ini:fim] += ...
+                fim = int(ini + dur * self.sr)
+
+                self.buffers[part][ini:fim] += y[:fim-ini]
 
         # --------------------------------------------------
         # TODO 4:
         # Normalizar ou controlar a amplitude de cada voz,
         # caso a equipe adote essa estratégia.
         # --------------------------------------------------
-
+    
         if verbose:
             print('Buffers preenchidos')
 
