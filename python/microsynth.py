@@ -251,7 +251,7 @@ def adsr(
     # o envelope final não ultrapasse a duração esperada.
     # --------------------------
 
-    S_n = N - (A_n + D_n + R_n)
+    S_n = N - (A_n + D_n)
 
     # --------------------------
     # TODO 3:
@@ -282,7 +282,8 @@ def adsr(
     # Garantir que o envelope tenha exatamente N amostras.
     # --------------------------
 
-    env = env[:N]
+    # Comentado para evolutiva 2
+    #env = env[:N]
 
     return env
 
@@ -473,13 +474,17 @@ class Instrumento:
         # use a função fm.
         # --------------------------
 
-        t = gera_tempo(dur, sr)
+        extra_time = 0
+        if self.adsr_params is not None:
+            extra_time += self.adsr_params[3]  # tempo de release
+
+        t = gera_tempo(dur + extra_time, sr)
         if self.forma in ['senoide', 'quadrada', 'triangular', 'dente']:
             y = sintetiza(
                 f=f,
                 forma=self.forma,
                 n=self.n_harm,
-                dur=dur,
+                dur=dur + extra_time,
                 sr=sr,
                 fase=self.fase,
                 unidade_fase=self.unidade_fase,
@@ -487,7 +492,7 @@ class Instrumento:
             )
         else:
             y = fm(
-                dur=dur,
+                dur=dur + extra_time,
                 f_c=f,
                 f_m=self.fm_params['f_m'],
                 I=self.fm_params['I'],
@@ -498,12 +503,13 @@ class Instrumento:
                 retorna_t=False
             )
 
+
         # --------------------------
         # TODO 2:
         # Aplicar envelope ADSR, caso self.adsr_params não seja None.
         # --------------------------
-
         if self.adsr_params is not None:
+            t = gera_tempo(len(y)/sr, sr)
             env = adsr(
                 dur=dur,
                 sr=sr,

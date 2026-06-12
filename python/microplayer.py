@@ -364,9 +364,13 @@ class Player:
         # para acomodar releases, filtros ou pequenas sobras de sinal.
         # --------------------------------------------------
 
+        releases = [instrumento.adsr_params[3] for instrumento in self.instrumentos]
+        max_release = int(max(releases) * self.sr)
+        duracao_nota = int(self.arqMIDI.duracao * self.sr)
+
         self.buffers = np.zeros((
             len(self.arqMIDI.parts),
-            int(self.arqMIDI.duracao * self.sr) + (self.sr // 2)
+            duracao_nota + max_release + self.sr
         ))
 
     def processa(
@@ -430,7 +434,7 @@ class Player:
                 y = instrumento.gerar_nota(f, dur, self.sr, amp)
         
                 ini = int(inicio * self.sr)
-                fim = int(ini + dur * self.sr)
+                fim = int(ini + y.shape[0])
 
                 self.buffers[part][ini:fim] += y[:fim-ini]
 
