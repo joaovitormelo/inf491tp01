@@ -245,13 +245,27 @@ def adsr(
     # TODO 2:
     # Calcular o número de amostras da fase de sustain.
     #
-    # Atenção:
+    # O envelope deve ter exatamente N amostras.
     # Caso A_n + D_n + R_n seja maior que N,
-    # a implementação deve tratar esse caso para que
-    # o envelope final não ultrapasse a duração esperada.
+    # reduzimos as fases de release, decay e attack
+    # para que o total não ultrapasse o esperado.
     # --------------------------
 
-    S_n = N - (A_n + D_n)
+    if A_n + D_n + R_n > N:
+        excesso = A_n + D_n + R_n - N
+        if excesso <= R_n:
+            R_n -= excesso
+        else:
+            excesso -= R_n
+            R_n = 0
+            if excesso <= D_n:
+                D_n -= excesso
+            else:
+                excesso -= D_n
+                D_n = 0
+                A_n = max(0, A_n - excesso)
+
+    S_n = N - (A_n + D_n + R_n)
 
     # --------------------------
     # TODO 3:
@@ -406,13 +420,22 @@ def sintetiza(
 
 ########################################################
 
+class Waveform:
+    def __init__(
+        self,
+        forma: str,
+        n_harm: int,
+    ):
+        self.forma = forma
+        self.n_harm = n_harm
+
+
 class Instrumento:
 
     def __init__(
         self,
         nome: str,
-        forma: str,
-        n_harm: int,
+        waveforms: list[Waveform],
         adsr_params: tuple,
         fase: float = 0.0,
         unidade_fase: str = 'graus',
@@ -422,8 +445,7 @@ class Instrumento:
         efeito_params: dict = None
     ):
         self.nome = nome
-        self.forma = forma
-        self.n_harm = n_harm
+        self.waveforms = waveforms
         self.adsr_params = adsr_params
         self.fase = fase
         self.unidade_fase = unidade_fase
@@ -431,6 +453,9 @@ class Instrumento:
         self.fm_params = fm_params
         self.filtro_params = filtro_params
         self.efeito_params = efeito_params
+        if not waveforms:
+            raise ValueError("A lista de waveforms não pode ser vazia")
+
 
     def gerar_nota(
         self,
@@ -456,62 +481,65 @@ class Instrumento:
 
         formas_validas = ['senoide', 'quadrada', 'triangular', 'dente', 'fm']
 
-        if self.forma not in formas_validas:
-            raise ValueError(f"Forma de onda inválida: {self.forma}")
-
-        if self.forma == 'fm' and self.fm_params is None:
-            raise ValueError("Parâmetros de FM devem ser informados quando forma='fm'")
-
-        # --------------------------
-        # TODO 1:
-        # Gerar o sinal base.
-        #
-        # Se self.forma estiver entre:
-        # 'senoide', 'quadrada', 'triangular' ou 'dente',
-        # use a função sintetiza.
-        #
-        # Se self.forma == 'fm',
-        # use a função fm.
-        # --------------------------
-
         extra_time = 0
         if self.adsr_params is not None:
             extra_time += self.adsr_params[3]  # tempo de release
 
         t = gera_tempo(dur + extra_time, sr)
-        if self.forma in ['senoide', 'quadrada', 'triangular', 'dente']:
-            y = sintetiza(
-                f=f,
-                forma=self.forma,
-                n=self.n_harm,
-                dur=dur + extra_time,
-                sr=sr,
-                fase=self.fase,
-                unidade_fase=self.unidade_fase,
-                retorna_t=False
-            )
-        else:
-            y = fm(
-                dur=dur + extra_time,
-                f_c=f,
-                f_m=self.fm_params['f_m'],
-                I=self.fm_params['I'],
-                tipo_fm=self.fm_params.get('tipo_fm', 'const'),
-                fase=self.fase,
-                unidade_fase=self.unidade_fase,
-                sr=sr,
-                retorna_t=False
-            )
+        y = np.zeros_like(t)
 
+        for waveform in self.waveforms:
+            if waveform["forma"] not in formas_validas:
+                raise ValueError(f"Forma de onda inválida: {waveform['forma']}")
 
+            if waveform["forma"] == 'fm' and self.fm_params is None:
+                raise ValueError("Parâmetros de FM devem ser informados quando forma='fm'")
+
+            # --------------------------
+            # TODO 1:
+            # Gerar o sinal base.
+            #
+            # Se self.forma estiver entre:
+            # 'senoide', 'quadrada', 'triangular' ou 'dente',
+            # use a função sintetiza.
+            #
+            # Se self.forma == 'fm',
+            # use a função fm.
+            # --------------------------
+
+            if waveform["forma"] in ['senoide', 'quadrada', 'triangular', 'dente']:
+                y += sintetiza(
+                    f=f,
+                    forma=waveform["forma"],
+                    n=waveform["n_harm"],
+                    dur=dur + extra_time,
+                    sr=sr,
+                    fase=self.fase,
+                    unidade_fase=self.unidade_fase,
+                    retorna_t=False
+                )
+            else:
+                y += fm(
+                    dur=dur + extra_time,
+                    f_c=f,
+                    f_m=self.fm_params['f_m'],
+                    I=self.fm_params['I'],
+                    tipo_fm=self.fm_params.get('tipo_fm', 'const'),
+                    fase=self.fase,
+                    unidade_fase=self.unidade_fase,
+                    sr=sr,
+                    retorna_t=False
+                )
+        
         # --------------------------
         # TODO 2:
         # Aplicar envelope ADSR, caso self.adsr_params não seja None.
         # --------------------------
         if self.adsr_params is not None:
+            total_dur = dur + self.adsr_params[3]
             t = gera_tempo(len(y)/sr, sr)
             env = adsr(
-                dur=dur,
+                dur=total_dur,
                 sr=sr,
                 A=self.adsr_params[0],
                 D=self.adsr_params[1],
@@ -543,7 +571,7 @@ class Instrumento:
         # Nesse caso, use a função fm_time_warp.
         # --------------------------
 
-        if self.forma != 'fm' and self.fm_params is not None:
+        if 'fm' not in [waveform["forma"] for waveform in self.waveforms] and self.fm_params is not None:
             y = fm_time_warp(
                 y=y,
                 t=t,
